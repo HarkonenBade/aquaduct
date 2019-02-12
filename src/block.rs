@@ -29,26 +29,19 @@
 // SUCH DAMAGE.
 //
 
-use crate::{
-    start::Start,
-    transform::Transform,
-    TransformStep,
-    IntoMap,
-    IntoPipeline,
-    QUEUE_SIZE,
-};
+use crate::{start::Start, transform::Transform, IntoMap, IntoPipeline, TransformStep, QUEUE_SIZE};
 
 use std::{
     marker::PhantomData,
     thread::{spawn, JoinHandle},
 };
 
-use crossbeam_channel::{bounded, Sender, Receiver};
+use crossbeam_channel::{bounded, Receiver, Sender};
 
 pub struct Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y>,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y>,
 {
     prev: P,
     inner: I,
@@ -58,9 +51,9 @@ pub struct Block<S, X, Y, P, I>
 }
 
 pub struct Builder<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y>,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y>,
 {
     prev: P,
     inner: I,
@@ -70,8 +63,8 @@ pub struct Builder<S, X, Y, P, I>
 }
 
 impl<S, X, P> Block<S, X, X, P, Start>
-    where
-        P: TransformStep<S, X>,
+where
+    P: TransformStep<S, X>,
 {
     pub(super) fn build(p: P) -> Builder<S, X, X, P, Start> {
         Builder {
@@ -85,16 +78,16 @@ impl<S, X, P> Block<S, X, X, P, Start>
 }
 
 impl<S, X, Y, P, I> Builder<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y> + 'static,
-        X: 'static,
-        Y: 'static + Send,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y> + 'static,
+    X: 'static,
+    Y: 'static + Send,
 {
     pub fn step<Z, F>(self, f: F) -> Builder<S, X, Z, P, Transform<X, F, Y, Z, I>>
-        where
-            F: Fn(Y) -> Z + Send + 'static,
-            Z: 'static + Send,
+    where
+        F: Fn(Y) -> Z + Send + 'static,
+        Z: 'static + Send,
     {
         Builder {
             prev: self.prev,
@@ -117,19 +110,20 @@ impl<S, X, Y, P, I> Builder<S, X, Y, P, I>
 }
 
 impl<S, X, Y, P, I> TransformStep<S, Y> for Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y> + 'static + Send,
-        X: 'static + Send,
-        Y: 'static + Send,
-{}
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y> + 'static + Send,
+    X: 'static + Send,
+    Y: 'static + Send,
+{
+}
 
 impl<S, X, Y, P, I> IntoPipeline<S, Y> for Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X> + IntoPipeline<S, X>,
-        I: TransformStep<X, Y> + IntoMap<X, Y> + 'static + Send,
-        X: 'static + Send,
-        Y: 'static + Send,
+where
+    P: TransformStep<S, X> + IntoPipeline<S, X>,
+    I: TransformStep<X, Y> + IntoMap<X, Y> + 'static + Send,
+    X: 'static + Send,
+    Y: 'static + Send,
 {
     fn into_pipeline(self) -> (Sender<S>, Receiver<Y>, Vec<JoinHandle<()>>) {
         let (send, thr_recv, mut thr_hdl) = self.prev.into_pipeline();

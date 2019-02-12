@@ -35,9 +35,9 @@ use crossbeam_channel::{bounded, Receiver, Sender};
 
 const QUEUE_SIZE: usize = 1;
 
-mod transform;
 mod block;
 mod par_block;
+mod transform;
 
 pub mod prelude {
     pub use crate::TransformStep as _aquaduct_TransformStep;
@@ -56,9 +56,8 @@ mod start {
         }
     }
 
-    impl<S> IntoMap<S, S> for Start
-    {
-        fn into_map<I: IntoIterator<Item=S> + 'static>(self, src: I) -> Box<Iterator<Item=S>> {
+    impl<S> IntoMap<S, S> for Start {
+        fn into_map<I: IntoIterator<Item = S> + 'static>(self, src: I) -> Box<Iterator<Item = S>> {
             Box::new(src.into_iter())
         }
     }
@@ -73,23 +72,23 @@ mod start {
 
 pub trait TransformStep<S, X> {
     fn step<NX, G>(self, f: G) -> transform::Transform<S, G, X, NX, Self>
-        where
-            Self: Sized,
-            G: Fn(X) -> NX,
+    where
+        Self: Sized,
+        G: Fn(X) -> NX,
     {
         transform::Transform::new(self, f)
     }
 
     fn block(self) -> block::Builder<S, X, X, Self, start::Start>
-        where
-            Self: Sized
+    where
+        Self: Sized,
     {
         block::Block::build(self)
     }
 
     fn par_block(self, chunk_size: usize) -> par_block::Builder<S, X, X, Self, start::Start>
-        where
-            Self: Sized
+    where
+        Self: Sized,
     {
         par_block::Block::build(self, chunk_size)
     }
@@ -99,9 +98,8 @@ pub trait IntoFn<S, X>: TransformStep<S, X> {
     fn into_fn(self) -> Box<Fn(S) -> X + Send + Sync>;
 }
 
-pub trait IntoMap<S, X>: TransformStep<S, X>
-{
-    fn into_map<I: IntoIterator<Item=S> + 'static>(self, src: I) -> Box<Iterator<Item = X>>;
+pub trait IntoMap<S, X>: TransformStep<S, X> {
+    fn into_map<I: IntoIterator<Item = S> + 'static>(self, src: I) -> Box<Iterator<Item = X>>;
 }
 
 pub trait IntoPipeline<S, X>: TransformStep<S, X> {
@@ -113,12 +111,12 @@ pub fn new_transform() -> start::Start {
 }
 
 pub fn pipeline<SS, S, DD, D, T>(mut src: S, tf: T, mut dst: D)
-    where
-        S: FnMut() -> Option<SS> + Send + 'static,
-        D: FnMut(DD) + Send + 'static,
-        T: IntoPipeline<SS, DD>,
-        SS: Send + 'static,
-        DD: Send + 'static,
+where
+    S: FnMut() -> Option<SS> + Send + 'static,
+    D: FnMut(DD) + Send + 'static,
+    T: IntoPipeline<SS, DD>,
+    SS: Send + 'static,
+    DD: Send + 'static,
 {
     let (ch_s, ch_d, mut thr) = tf.into_pipeline();
 

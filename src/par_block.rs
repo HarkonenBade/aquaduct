@@ -29,28 +29,21 @@
 // SUCH DAMAGE.
 //
 
-use crate::{
-    start::Start,
-    transform::Transform,
-    TransformStep,
-    IntoFn,
-    IntoPipeline,
-    QUEUE_SIZE,
-};
+use crate::{start::Start, transform::Transform, IntoFn, IntoPipeline, TransformStep, QUEUE_SIZE};
 
 use std::{
     marker::PhantomData,
     thread::{spawn, JoinHandle},
 };
 
-use crossbeam_channel::{bounded, Sender, Receiver};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use itertools::Itertools;
 use rayon::prelude::*;
 
 pub struct Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y>,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y>,
 {
     prev: P,
     inner: I,
@@ -61,9 +54,9 @@ pub struct Block<S, X, Y, P, I>
 }
 
 pub struct Builder<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y>,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y>,
 {
     prev: P,
     inner: I,
@@ -74,8 +67,8 @@ pub struct Builder<S, X, Y, P, I>
 }
 
 impl<S, X, P> Block<S, X, X, P, Start>
-    where
-        P: TransformStep<S, X>,
+where
+    P: TransformStep<S, X>,
 {
     pub(super) fn build(p: P, chunk_size: usize) -> Builder<S, X, X, P, Start> {
         Builder {
@@ -90,16 +83,16 @@ impl<S, X, P> Block<S, X, X, P, Start>
 }
 
 impl<S, X, Y, P, I> Builder<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y> + 'static,
-        X: 'static,
-        Y: 'static + Send,
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y> + 'static,
+    X: 'static,
+    Y: 'static + Send,
 {
     pub fn step<Z, F>(self, f: F) -> Builder<S, X, Z, P, Transform<X, F, Y, Z, I>>
-        where
-            F: Fn(Y) -> Z + Send + 'static,
-            Z: 'static + Send,
+    where
+        F: Fn(Y) -> Z + Send + 'static,
+        Z: 'static + Send,
     {
         Builder {
             prev: self.prev,
@@ -124,19 +117,20 @@ impl<S, X, Y, P, I> Builder<S, X, Y, P, I>
 }
 
 impl<S, X, Y, P, I> TransformStep<S, Y> for Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X>,
-        I: TransformStep<X, Y> + 'static + Send,
-        X: 'static + Send,
-        Y: 'static + Send,
-{}
+where
+    P: TransformStep<S, X>,
+    I: TransformStep<X, Y> + 'static + Send,
+    X: 'static + Send,
+    Y: 'static + Send,
+{
+}
 
 impl<S, X, Y, P, I> IntoPipeline<S, Y> for Block<S, X, Y, P, I>
-    where
-        P: TransformStep<S, X> + IntoPipeline<S, X>,
-        I: TransformStep<X, Y> + IntoFn<X, Y> + 'static + Send,
-        X: 'static + Send,
-        Y: 'static + Send,
+where
+    P: TransformStep<S, X> + IntoPipeline<S, X>,
+    I: TransformStep<X, Y> + IntoFn<X, Y> + 'static + Send,
+    X: 'static + Send,
+    Y: 'static + Send,
 {
     fn into_pipeline(self) -> (Sender<S>, Receiver<Y>, Vec<JoinHandle<()>>) {
         let (send, pack_r, mut thr_hdl) = self.prev.into_pipeline();
@@ -146,16 +140,14 @@ impl<S, X, Y, P, I> IntoPipeline<S, Y> for Block<S, X, Y, P, I>
         let tf = self.inner.into_fn();
         let chunk_size = self.chunk_size;
         thr_hdl.push(spawn(move || {
-            for val in pack_r
-                .into_iter()
-                .batching(move |i| {
-                    let v = i.take(chunk_size).collect::<Vec<_>>();
-                    if v.is_empty() {
-                        None
-                    } else {
-                        Some(v)
-                    }
-                }) {
+            for val in pack_r.into_iter().batching(move |i| {
+                let v = i.take(chunk_size).collect::<Vec<_>>();
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v)
+                }
+            }) {
                 if pack_w.send(val).is_err() {
                     break;
                 }
@@ -164,7 +156,10 @@ impl<S, X, Y, P, I> IntoPipeline<S, Y> for Block<S, X, Y, P, I>
 
         thr_hdl.push(spawn(move || {
             for val in tf_r {
-                if tf_w.send(val.into_par_iter().map(|v| tf(v)).collect::<Vec<_>>()).is_err() {
+                if tf_w
+                    .send(val.into_par_iter().map(|v| tf(v)).collect::<Vec<_>>())
+                    .is_err()
+                {
                     break;
                 }
             }

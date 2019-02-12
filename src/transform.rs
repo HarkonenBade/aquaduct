@@ -29,25 +29,19 @@
 // SUCH DAMAGE.
 //
 
-use crate::{
-    TransformStep,
-    IntoFn,
-    IntoMap,
-    IntoPipeline,
-    QUEUE_SIZE,
-};
+use crate::{IntoFn, IntoMap, IntoPipeline, TransformStep, QUEUE_SIZE};
 
 use std::{
     marker::PhantomData,
     thread::{spawn, JoinHandle},
 };
 
-use crossbeam_channel::{bounded, Sender, Receiver};
+use crossbeam_channel::{bounded, Receiver, Sender};
 
 pub struct Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin>,
-        F: Fn(Xin) -> Xout,
+where
+    P: TransformStep<S, Xin>,
+    F: Fn(Xin) -> Xout,
 {
     previous: P,
     transform: F,
@@ -57,9 +51,9 @@ pub struct Transform<S, F, Xin, Xout, P>
 }
 
 impl<S, F, Xin, Xout, P> Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin>,
-        F: Fn(Xin) -> Xout,
+where
+    P: TransformStep<S, Xin>,
+    F: Fn(Xin) -> Xout,
 {
     pub(super) fn new(p: P, f: F) -> Self {
         Transform {
@@ -73,17 +67,18 @@ impl<S, F, Xin, Xout, P> Transform<S, F, Xin, Xout, P>
 }
 
 impl<S, F, Xin, Xout, P> TransformStep<S, Xout> for Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin>,
-        F: Fn(Xin) -> Xout,
-{}
+where
+    P: TransformStep<S, Xin>,
+    F: Fn(Xin) -> Xout,
+{
+}
 
 impl<S, F, Xin, Xout, P> IntoFn<S, Xout> for Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin> + IntoFn<S, Xin>,
-        F: Fn(Xin) -> Xout + 'static + Send + Sync,
-        S: 'static,
-        Xin: 'static,
+where
+    P: TransformStep<S, Xin> + IntoFn<S, Xin>,
+    F: Fn(Xin) -> Xout + 'static + Send + Sync,
+    S: 'static,
+    Xin: 'static,
 {
     fn into_fn(self) -> Box<Fn(S) -> Xout + Send + Sync> {
         let inner = self.previous.into_fn();
@@ -93,12 +88,12 @@ impl<S, F, Xin, Xout, P> IntoFn<S, Xout> for Transform<S, F, Xin, Xout, P>
 }
 
 impl<S, F, Xin, Xout, P> IntoMap<S, Xout> for Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin> + IntoMap<S, Xin>,
-        F: Fn(Xin) -> Xout + 'static,
-        Xin: 'static,
+where
+    P: TransformStep<S, Xin> + IntoMap<S, Xin>,
+    F: Fn(Xin) -> Xout + 'static,
+    Xin: 'static,
 {
-    fn into_map<I: IntoIterator<Item=S> + 'static>(self, src: I) -> Box<Iterator<Item=Xout>> {
+    fn into_map<I: IntoIterator<Item = S> + 'static>(self, src: I) -> Box<Iterator<Item = Xout>> {
         let inner = self.previous.into_map(src);
         let tf = self.transform;
         Box::new(inner.map(tf))
@@ -106,11 +101,11 @@ impl<S, F, Xin, Xout, P> IntoMap<S, Xout> for Transform<S, F, Xin, Xout, P>
 }
 
 impl<S, F, Xin, Xout, P> IntoPipeline<S, Xout> for Transform<S, F, Xin, Xout, P>
-    where
-        P: TransformStep<S, Xin> + IntoPipeline<S, Xin>,
-        F: Fn(Xin) -> Xout + Send + 'static,
-        Xin: Send + 'static,
-        Xout: Send + 'static,
+where
+    P: TransformStep<S, Xin> + IntoPipeline<S, Xin>,
+    F: Fn(Xin) -> Xout + Send + 'static,
+    Xin: Send + 'static,
+    Xout: Send + 'static,
 {
     fn into_pipeline(self) -> (Sender<S>, Receiver<Xout>, Vec<JoinHandle<()>>) {
         let (send, thr_recv, mut thr_hdl) = self.previous.into_pipeline();
